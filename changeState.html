@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Change Submission State</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .submission-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .action-section {
+            margin: 20px 0;
+        }
+        .action-buttons {
+            margin: 15px 0;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        .btn-waiting {
+            background-color: #ff9800;
+        }
+        .btn-waiting:hover {
+            background-color: #f57c00;
+        }
+        .btn-declined {
+            background-color: #d32f2f;
+        }
+        .btn-declined:hover {
+            background-color: #b71c1c;
+        }
+        .btn-custom {
+            background-color: #7b1fa2;
+        }
+        .btn-custom:hover {
+            background-color: #6a1b9a;
+        }
+        .custom-input {
+            margin: 10px 0;
+        }
+        .custom-input input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+            margin-right: 10px;
+        }
+        .status-current {
+            font-weight: bold;
+            color: #333;
+        }
+        .status-waiting {
+            color: #ff9800;
+        }
+        .status-declined {
+            color: #d32f2f;
+        }
+        .status-custom {
+            color: #7b1fa2;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #388e3c;
+            background-color: #e8f5e8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Change Submission State</h1>
+
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="success" class="success" style="display: none;"></div>
+
+    <div id="submissionInfo" class="submission-info">
+        Loading submission details...
+    </div>
+
+    <div class="action-section">
+        <h3>Change Status To:</h3>
+
+        <div class="action-buttons">
+            <button class="btn-waiting" onclick="changeToWaiting()">Change to Waiting for Approval</button>
+            <button class="btn-declined" onclick="changeToDeclined()">Change to Declined</button>
+            <button class="btn-custom" onclick="toggleCustomInput()">Change to Custom</button>
+        </div>
+
+        <div id="customInput" class="custom-input" style="display: none;">
+            <input type="text" id="customStatus" placeholder="Enter custom status" />
+            <button onclick="changeToCustom()">Apply Custom Status</button>
+        </div>
+    </div>
+
+    <div>
+        <button onclick="goBack()">Back to List</button>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyOq_TffVYc4iOlTZA6S6HeLOrVvEct5XnTwPE8Soy8X3PPcrYohdzS1-hTg_lpSnuz/exec';
+
+    function getUrlParameter(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+    }
+
+    const submissionId = getUrlParameter('sId');
+    const password = getUrlParameter('password');
+    let currentSubmission = null;
+
+    // Load submission details on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!submissionId || !password) {
+            showError('Missing submission ID or password');
+            return;
+        }
+        loadSubmissionDetails();
+    });
+
+    function showError(message) {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        hideSuccess();
+    }
+
+    function hideError() {
+        document.getElementById('error').style.display = 'none';
+    }
+
+    function showSuccess(message) {
+        const successDiv = document.getElementById('success');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+        hideError();
+    }
+
+    function hideSuccess() {
+        document.getElementById('success').style.display = 'none';
+    }
+
+    function showLoading() {
+        document.getElementById('submissionInfo').innerHTML = '<div class="loading">Loading submission details...</div>';
+    }
+
+    async function loadSubmissionDetails() {
+        showLoading();
+        hideError();
+        hideSuccess();
+
+        try {
+            const response = await fetch(`${API_BASE_URL}?action=get&key=${submissionId}&password=${encodeURIComponent(password)}`);
+            const data = await response.json();
+
+            if (data.success) {
+                currentSubmission = data.data;
+                displaySubmissionInfo(data.data);
+            } else {
+                if (data.error && data.error.includes('password')) {
+                    showError('Authentication failed. Please go back and re-enter password.');
+                } else {
+                    showError(`Error loading submission: ${data.error}`);
+                }
+            }
+        } catch (error) {
+            showError(`Network error: ${error.message}`);
+        }
+    }
+
+    function displaySubmissionInfo(submission) {
+        const status = submission.status || '';
+        const statusDisplay = getStatusDisplay(status);
+        const statusClass = getStatusClass(status);
+
+        document.getElementById('submissionInfo').innerHTML = `
+            <h3>Submission: ${submissionId}</h3>
+            <p><strong>Title:</strong> ${submission.title || 'N/A'}</p>
+            <p><strong>Content:</strong> ${submission.content || 'N/A'}</p>
+            <p><strong>Timestamp:</strong> ${submission.timestamp || 'N/A'}</p>
+            <p><strong>Current Status:</strong> <span class="status-current ${statusClass}">${statusDisplay}</span></p>
+            ${submission.attachment ? `<p><strong>Attachment:</strong> <a href="${submission.attachment}" target="_blank">View Attachment</a></p>` : ''}
+        `;
+    }
+
+    function getStatusClass(status) {
+        if (!status || status.trim() === '') {
+            return 'status-waiting';
+        } else if (status.startsWith('SEC')) {
+            return 'status-posted';
+        } else if (status.toLowerCase() === 'declined') {
+            return 'status-declined';
+        } else {
+            return 'status-custom';
+        }
+    }
+
+    function getStatusDisplay(status) {
+        if (!status || status.trim() === '') {
+            return 'Waiting for approval';
+        } else if (status.startsWith('SEC')) {
+            return status;
+        } else if (status.toLowerCase() === 'declined') {
+            return 'Declined';
+        } else {
+            return status;
+        }
+    }
+
+    function toggleCustomInput() {
+        const customInput = document.getElementById('customInput');
+        customInput.style.display = customInput.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function updateStatus(newStatus) {
+        if (!submissionId || !password) {
+            showError('Missing submission ID or password');
+            return;
+        }
+
+        hideError();
+        hideSuccess();
+
+        try {
+            const response = await fetch(`${API_BASE_URL}?action=update&key=${submissionId}&status=${encodeURIComponent(newStatus)}&password=${encodeURIComponent(password)}`);
+            const data = await response.json();
+
+            if (data.success) {
+                showSuccess(`Status updated successfully to: ${newStatus}`);
+                // Reload the submission details to show the updated status
+                setTimeout(() => {
+                    loadSubmissionDetails();
+                }, 1000);
+            } else {
+                if (data.error && data.error.includes('password')) {
+                    showError('Authentication failed. Please go back and re-enter password.');
+                } else {
+                    showError(`Error updating status: ${data.error}`);
+                }
+            }
+        } catch (error) {
+            showError(`Network error: ${error.message}`);
+        }
+    }
+
+    function changeToWaiting() {
+        if (confirm(`Change submission ${submissionId} to "Waiting for approval"?`)) {
+            updateStatus('');
+        }
+    }
+
+    function changeToDeclined() {
+        if (confirm(`Change submission ${submissionId} to "Declined"?`)) {
+            updateStatus('Declined');
+        }
+    }
+
+    function changeToCustom() {
+        const customStatus = document.getElementById('customStatus').value.trim();
+        if (!customStatus) {
+            showError('Please enter a custom status');
+            return;
+        }
+
+        if (confirm(`Change submission ${submissionId} to "${customStatus}"?`)) {
+            updateStatus(customStatus);
+            // Hide custom input after applying
+            document.getElementById('customInput').style.display = 'none';
+            document.getElementById('customStatus').value = '';
+        }
+    }
+
+    function goBack() {
+        window.location.href = `index.html`;
+    }
+
+    // Allow Enter key in custom status input
+    document.getElementById('customStatus')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            changeToCustom();
+        }
+    });
+</script>
+</body>
+</html>
