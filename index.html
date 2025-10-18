@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submission Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .password-section {
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .password-input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+            width: 200px;
+            font-size: 16px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f3f4;
+        }
+        .submission-link {
+            color: #4285f4;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .submission-link:hover {
+            text-decoration: underline;
+        }
+        .status-pending {
+            color: #f57c00;
+            font-weight: bold;
+        }
+        .status-posted {
+            color: #388e3c;
+            font-weight: bold;
+        }
+        .status-declined {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+        .status-empty {
+            color: #ff9800;
+            font-weight: bold;
+            font-style: italic;
+        }
+        .count-info {
+            margin: 10px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .remember-me {
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .remember-me input {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Submissions</h1>
+
+    <div class="password-section" id="passwordSection">
+        <div>
+            <input type="password" id="passwordInput" class="password-input" placeholder="Enter password" />
+            <button onclick="setPassword()">Set Password</button>
+        </div>
+        <div class="remember-me">
+            <input type="checkbox" id="rememberMe" checked />
+            <label for="rememberMe">Remember password</label>
+        </div>
+    </div>
+
+    <div class="controls" id="controlsSection" style="display: none;">
+        <button id="fetchBtn" onclick="fetchSubmissions()">Fetch Submissions</button>
+        <div id="loading" class="loading" style="display: none;">Loading submissions...</div>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div id="countInfo" class="count-info" style="display: none;"></div>
+
+    <div id="tableContainer">
+        <table id="submissionsTable" style="display: none;">
+            <thead>
+            <tr>
+                <th>Submission ID</th>
+                <th>Timestamp</th>
+                <th>Title</th>
+                <th>Content</th>
+                <th>Attachment</th>
+                <th>Current State</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <!-- Table rows will be inserted here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyOq_TffVYc4iOlTZA6S6HeLOrVvEct5XnTwPE8Soy8X3PPcrYohdzS1-hTg_lpSnuz/exec';
+    const STORAGE_KEY = 'submission_password';
+
+    // Check for saved password on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedPassword = localStorage.getItem(STORAGE_KEY);
+        if (savedPassword) {
+            document.getElementById('passwordInput').value = savedPassword;
+            setPassword();
+        }
+    });
+
+    let currentPassword = '';
+    let allSubmissions = {};
+
+    function setPassword() {
+        const passwordInput = document.getElementById('passwordInput');
+        const password = passwordInput.value.trim();
+
+        if (!password) {
+            showError('Please enter a password');
+            return;
+        }
+
+        currentPassword = password;
+
+        // Save to localStorage if remember me is checked
+        const rememberMe = document.getElementById('rememberMe').checked;
+        if (rememberMe) {
+            localStorage.setItem(STORAGE_KEY, password);
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+
+        // Hide password section, show controls
+        document.getElementById('passwordSection').style.display = 'none';
+        document.getElementById('controlsSection').style.display = 'block';
+
+        // Auto-fetch submissions
+        fetchSubmissions();
+    }
+
+    function clearPassword() {
+        currentPassword = '';
+        localStorage.removeItem(STORAGE_KEY);
+        document.getElementById('passwordSection').style.display = 'block';
+        document.getElementById('controlsSection').style.display = 'none';
+        document.getElementById('tableContainer').style.display = 'none';
+        document.getElementById('countInfo').style.display = 'none';
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('error');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+
+    function hideError() {
+        document.getElementById('error').style.display = 'none';
+    }
+
+    function showLoading() {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('fetchBtn').disabled = true;
+    }
+
+    function hideLoading() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('fetchBtn').disabled = false;
+    }
+
+    function getStatusClass(status) {
+        if (!status || status.trim() === '') {
+            return 'status-empty';
+        } else if (status.startsWith('SEC')) {
+            return 'status-posted';
+        } else if (status.toLowerCase() === 'declined') {
+            return 'status-declined';
+        } else {
+            return 'status-pending';
+        }
+    }
+
+    function getStatusDisplay(status) {
+        if (!status || status.trim() === '') {
+            return 'Waiting for approval';
+        } else if (status.startsWith('SEC')) {
+            return status;
+        } else if (status.toLowerCase() === 'declined') {
+            return 'Declined';
+        } else {
+            return status;
+        }
+    }
+
+    function getNextPostId() {
+        // Find the highest existing SEC ID and increment it
+        let maxId = 0;
+
+        Object.values(allSubmissions).forEach(submission => {
+            if (submission.status && submission.status.startsWith('SEC')) {
+                const idNum = parseInt(submission.status.replace('SEC', ''));
+                if (idNum > maxId) {
+                    maxId = idNum;
+                }
+            }
+        });
+
+        // Return next ID in format SEC00001
+        const nextId = maxId + 1;
+        return 'SEC' + String(nextId).padStart(5, '0');
+    }
+
+    function getTargetPage(submissionId, currentStatus) {
+        if (!currentStatus || currentStatus.trim() === '') {
+            const nextPostId = getNextPostId();
+            return `edit.html?sId=${submissionId}&password=${encodeURIComponent(currentPassword)}&postId=${nextPostId}`;
+        } else {
+            return `changeState.html?sId=${submissionId}&password=${encodeURIComponent(currentPassword)}`;
+        }
+    }
+
+    function sortSubmissions(submissions) {
+        // Convert object to array and sort
+        const submissionsArray = Object.entries(submissions);
+
+        // Sort by submission ID (ascending) but prioritize by status
+        submissionsArray.sort((a, b) => {
+            const idA = a[0];
+            const idB = b[0];
+            const statusA = a[1].status || '';
+            const statusB = b[1].status || '';
+
+            // Check if either has final status (posted or declined)
+            const isFinalA = statusA.startsWith('SEC') || statusA.toLowerCase() === 'declined';
+            const isFinalB = statusB.startsWith('SEC') || statusB.toLowerCase() === 'declined';
+
+            // If both have final status or both don't, sort by ID
+            if (isFinalA === isFinalB) {
+                return idA.localeCompare(idB);
+            }
+
+            // Put final status submissions at the bottom
+            return isFinalA ? 1 : -1;
+        });
+
+        return submissionsArray;
+    }
+
+    function displaySubmissions(submissions) {
+        const tableBody = document.getElementById('tableBody');
+        const table = document.getElementById('submissionsTable');
+        const countInfo = document.getElementById('countInfo');
+
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        if (Object.keys(submissions).length === 0) {
+            countInfo.textContent = 'No submissions found.';
+            countInfo.style.display = 'block';
+            table.style.display = 'none';
+            return;
+        }
+
+        // Sort submissions
+        const sortedSubmissions = sortSubmissions(submissions);
+
+        // Count by status
+        const statusCount = {
+            empty: 0,
+            posted: 0,
+            declined: 0,
+            other: 0
+        };
+
+        // Create table rows
+        sortedSubmissions.forEach(([submissionId, data]) => {
+            const status = data.status || '';
+
+            // Count status types
+            if (!status || status.trim() === '') {
+                statusCount.empty++;
+            } else if (status.startsWith('SEC')) {
+                statusCount.posted++;
+            } else if (status.toLowerCase() === 'declined') {
+                statusCount.declined++;
+            } else {
+                statusCount.other++;
+            }
+
+            const row = document.createElement('tr');
+
+            // Create clickable submission ID
+            const link = document.createElement('a');
+            link.href = getTargetPage(submissionId, status);
+            link.textContent = submissionId;
+            link.className = 'submission-link';
+
+            const idCell = document.createElement('td');
+            idCell.appendChild(link);
+
+            row.appendChild(idCell);
+            row.appendChild(createCell(data.timestamp || ''));
+            row.appendChild(createCell(data.title || ''));
+            row.appendChild(createCell(data.content || ''));
+
+            // Attachment cell with clickable link if URL exists
+            const attachmentCell = document.createElement('td');
+            if (data.attachment && data.attachment.trim() !== '') {
+                attachmentCell.textContent = data.attachment
+            } else {
+                attachmentCell.textContent = 'No attachment';
+            }
+            row.appendChild(attachmentCell);
+
+            // Status cell with styling
+            const statusCell = document.createElement('td');
+            statusCell.textContent = getStatusDisplay(status);
+            statusCell.className = getStatusClass(status);
+            row.appendChild(statusCell);
+
+            tableBody.appendChild(row);
+        });
+
+        // Update count info
+        countInfo.innerHTML = `
+                Total submissions: ${sortedSubmissions.length} |
+                Waiting: ${statusCount.empty} |
+                Posted: ${statusCount.posted} |
+                Declined: ${statusCount.declined} |
+                Other: ${statusCount.other}
+            `;
+        countInfo.style.display = 'block';
+        table.style.display = 'table';
+    }
+
+    function createCell(content) {
+        const cell = document.createElement('td');
+        cell.textContent = content;
+        return cell;
+    }
+
+    async function fetchSubmissions() {
+        if (!currentPassword) {
+            showError('Please set a password first');
+            return;
+        }
+
+        showLoading();
+        hideError();
+
+        try {
+            const response = await fetch(`${API_BASE_URL}?action=list&password=${encodeURIComponent(currentPassword)}`);
+            const data = await response.json();
+
+            if (data.success) {
+                allSubmissions = data.data;
+                displaySubmissions(data.data);
+            } else {
+                if (data.error && data.error.includes('password')) {
+                    showError('Authentication failed. Please re-enter password.');
+                    clearPassword();
+                } else {
+                    showError(`Error: ${data.error}`);
+                }
+            }
+        } catch (error) {
+            showError(`Network error: ${error.message}`);
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // Allow Enter key to set password
+    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            setPassword();
+        }
+    });
+</script>
+</body>
+</html>
