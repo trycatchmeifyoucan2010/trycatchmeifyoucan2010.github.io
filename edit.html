@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Add this in the <head> section -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <title>Submission Editor</title>
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --secondary-color: #34a853;
+            --danger-color: #ea4335;
+            --light-gray: #f5f5f5;
+            --dark-gray: #333;
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        h1, h2, h3 {
+            color: var(--dark-gray);
+            margin-bottom: 20px;
+        }
+
+        .submission-info {
+            background-color: var(--light-gray);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .title-textarea {
+            min-height: 80px;
+        }
+
+        .content-textarea {
+            min-height: 120px;
+        }
+
+        .admin-textarea {
+            min-height: 80px;
+        }
+
+        .attachment {
+            background-color: #f9f9f9;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px dashed #ccc;
+            word-break: break-all;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 25px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #3367d6;
+        }
+
+        .btn-success {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #2e8b47;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #d33426;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .caption-box {
+            min-height: 150px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin-top: 15px;
+        }
+
+        /* Instagram square aspect ratio (1:1) */
+        .thumbnail-preview {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1/1; /* Changed from 16/9 to 1/1 for Instagram */
+            background: linear-gradient(135deg, #87CEEB 0%, #1E90FF 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            margin: 0 auto 25px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .thumbnail-preview::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%);
+            pointer-events: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 12px;
+        }
+
+        .status-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .status-posted {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .status-declined {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 25px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .thumbnail-title {
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.4;
+            word-wrap: break-word;
+            width: 100%;
+            z-index: 1;
+            position: relative;
+        }
+
+        /* Instagram-style branding (optional) */
+        .instagram-brand {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+
+        @media (min-width: 768px) {
+            .panels-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+                align-items: start;
+            }
+
+            .panels-row > div > .panel {
+                margin-bottom: 30px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .container {
+                gap: 20px;
+            }
+
+            .panel {
+                margin-bottom: 20px;
+                padding: 20px;
+            }
+
+            .panels-row {
+                gap: 20px;
+            }
+
+            /* Adjust thumbnail size for mobile */
+            .thumbnail-preview {
+                max-width: 300px;
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="panel">
+        <h1>Edit Submission</h1>
+        <div id="submissionInfo" class="submission-info">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading submission details...</p>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-danger" onclick="declineSubmission()">Decline Submission</button>
+            <button class="btn-secondary" onclick="goBack()">Back to List</button>
+        </div>
+    </div>
+
+    <div class="panels-row">
+        <div>
+            <div class="panel">
+                <h2>Edit Content</h2>
+                <div class="form-group">
+                    <label for="postId">Post ID</label>
+                    <input type="text" id="postId" placeholder="Enter post ID (e.g., SEC00001)">
+                </div>
+
+                <div class="form-group">
+                    <label for="timestamp">Timestamp</label>
+                    <input type="text" id="timestamp" placeholder="YYYY-MM-dd hh:mm:ss">
+                </div>
+
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <textarea id="title" class="title-textarea" placeholder="Enter title (supports multiple lines)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="content">Content</label>
+                    <textarea id="content" class="content-textarea" placeholder="Enter content"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="adminWords">Admin's Words</label>
+                    <textarea id="adminWords" class="admin-textarea" placeholder="Enter admin's commentary"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Attachment</label>
+                    <div id="attachment" class="attachment">No attachment</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Formatted Caption</h2>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="compileCaption()">Compile Caption</button>
+                    <button class="btn-secondary" onclick="copyCaption()">Copy Caption</button>
+                </div>
+                <textarea id="formattedCaption" class="caption-box" placeholder="Formatted caption will appear here..."></textarea>
+            </div>
+
+            <div class="panel">
+                <h2>Update Status</h2>
+                <div class="button-group">
+                    <button class="btn-success" onclick="setStatusToPosted()">Set Status to Posted</button>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="panel">
+                <h2>Thumbnail Preview</h2>
+                <div id="thumbnailPreview" class="thumbnail-preview">
+                    <div class="thumbnail-title">Thumbnail Preview</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="downloadThumbnail()">Download Thumbnail</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Configuration
+    const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbyOq_TffVYc4iOlTZA6S6HeLOrVvEct5XnTwPE8Soy8X3PPcrYohdzS1-hTg_lpSnuz/exec';
+
+    // Get URL parameters
+    function getUrlParameter(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+    }
+
+    const submissionId = getUrlParameter('sId');
+    const postId = getUrlParameter('postId');
+    const password = getUrlParameter('password');
+
+    // DOM elements
+    const submissionInfoEl = document.getElementById('submissionInfo');
+    const postIdEl = document.getElementById('postId');
+    const timestampEl = document.getElementById('timestamp');
+    const titleEl = document.getElementById('title');
+    const contentEl = document.getElementById('content');
+    const adminWordsEl = document.getElementById('adminWords');
+    const attachmentEl = document.getElementById('attachment');
+    const formattedCaptionEl = document.getElementById('formattedCaption');
+    const thumbnailPreviewEl = document.getElementById('thumbnailPreview');
+
+    // Current submission data
+    let submissionData = null;
+
+    // Initialize the page
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!password) {
+            showError('Password is required');
+            return;
+        }
+
+        if (submissionId) {
+            fetchSubmissionData();
+        } else {
+            showError('No submission ID provided');
+        }
+
+        // Set default post ID if provided
+        if (postId) {
+            postIdEl.value = postId;
+        }
+
+        // Set current timestamp as default
+        const now = new Date();
+        timestampEl.value = formatDate(now);
+    });
+
+    // Fetch submission data from API
+    async function fetchSubmissionData() {
+        try {
+            submissionInfoEl.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading submission details...</p>
+                    </div>
+                `;
+
+            const response = await fetch(`${API_BASE_URL}?action=get&key=${submissionId}&password=${password}`);
+            const data = await response.json();
+
+            if (data.success) {
+                submissionData = data.data;
+                displaySubmissionInfo();
+                populateFormFields();
+                updateThumbnailPreview();
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (error) {
+            showError(`Failed to fetch submission: ${error.message}`);
+        }
+    }
+
+    // Display submission information
+    function displaySubmissionInfo() {
+        if (!submissionData) return;
+
+        let statusClass = 'status-pending';
+        let statusText = 'Pending';
+
+        if (submissionData.status.startsWith('SEC')) {
+            statusClass = 'status-posted';
+            statusText = 'Posted';
+        } else if (submissionData.status === 'Declined') {
+            statusClass = 'status-declined';
+            statusText = 'Declined';
+        }
+
+        submissionInfoEl.innerHTML = `
+                <h3>Submission: ${submissionId} <span class="status-indicator ${statusClass}">${statusText}</span></h3>
+                <p><strong>Original Timestamp:</strong> ${submissionData.timestamp}</p>
+                <p><strong>Title:</strong> ${submissionData.title}</p>
+                <p><strong>Content:</strong> ${submissionData.content.substring(0, 100)}${submissionData.content.length > 100 ? '...' : ''}</p>
+                ${submissionData.attachment ? `<p><strong>Attachment:</strong> ${submissionData.attachment}</p>` : ''}
+            `;
+    }
+
+    // Populate form fields with submission data
+    function populateFormFields() {
+        if (!submissionData) return;
+
+        // Only set timestamp if not already set
+        if (!timestampEl.value) {
+            timestampEl.value = formatDate(new Date(submissionData.timestamp));
+        }
+
+        titleEl.value = submissionData.title;
+        contentEl.value = submissionData.content;
+
+        if (submissionData.attachment) {
+            attachmentEl.textContent = submissionData.attachment;
+        }
+    }
+
+    // Format date as YYYY-MM-dd hh:mm:ss
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+
+    // Compile the formatted caption
+    function compileCaption() {
+        const postId = postIdEl.value || 'SEC00000';
+        const timestamp = timestampEl.value || formatDate(new Date());
+        const title = titleEl.value ? titleEl.value.replace(/\n/g, ' ') : 'Untitled';
+        const content = contentEl.value || 'No content';
+        const adminWords = adminWordsEl.value || '';
+        const attachment = attachmentEl.textContent;
+
+        let caption = `投稿編號: #${postId}\n`;
+        caption += `投稿時間: ${timestamp}\n`;
+        caption += `標題: ${title}\n`;
+        caption += `============================\n`;
+        caption += `${content}\n\n`;
+
+        if (adminWords) {
+            caption += `Admin按：${adminWords}\n\n`;
+        }
+
+        caption += `\n============================\n`;
+
+        if (attachment && attachment !== 'No attachment') {
+            caption += `附件: \n${attachment}`;
+        }
+
+        formattedCaptionEl.value = caption;
+    }
+
+    // Copy caption to clipboard
+    async function copyCaption() {
+        try {
+            await navigator.clipboard.writeText(formattedCaptionEl.value);
+            alert('Caption copied to clipboard!');
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+            alert('Failed to copy caption to clipboard');
+        }
+    }
+
+    // Update thumbnail preview
+    function updateThumbnailPreview() {
+        const title = titleEl.value || 'Default Title';
+        const thumbnailTitleEl = thumbnailPreviewEl.querySelector('.thumbnail-title');
+        thumbnailTitleEl.innerHTML = title.replace(/\n/g, '<br>');
+
+        // Adjust font size based on title length for better fit in square
+        const length = title.length;
+        let fontSize;
+        if (length < 15) {
+            fontSize = '32px';
+        } else if (length < 30) {
+            fontSize = '28px';
+        } else if (length < 50) {
+            fontSize = '24px';
+        } else if (length < 80) {
+            fontSize = '20px';
+        } else {
+            fontSize = '18px';
+        }
+        thumbnailTitleEl.style.fontSize = fontSize;
+    }
+
+    // Download thumbnail as image
+    async function downloadThumbnail() {
+        try {
+            // Show loading state
+            const originalText = thumbnailPreviewEl.querySelector('.thumbnail-title').textContent;
+
+            // Use html2canvas to capture the thumbnail
+            const canvas = await html2canvas(thumbnailPreviewEl, {
+                backgroundColor: null, // Transparent background
+                scale: 3, // Increased from 2 to 3 for higher resolution
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+            });
+
+            // Convert canvas to blob
+            canvas.toBlob(function(blob) {
+                // Create download link
+                const link = document.createElement('a');
+                link.download = `thumbnail-${postIdEl.value || 'SEC00000'}.png`;
+                link.href = URL.createObjectURL(blob);
+
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Clean up
+                URL.revokeObjectURL(link.href);
+
+                // Restore original text
+                thumbnailPreviewEl.querySelector('.thumbnail-title').textContent = originalText;
+
+            }, 'image/png', 1.0); // PNG format with maximum quality
+
+        } catch (error) {
+            console.error('Failed to generate thumbnail:', error);
+            alert('Failed to generate thumbnail image. Please try again.');
+
+            // Restore original text in case of error
+            const originalText = thumbnailPreviewEl.textContent;
+            thumbnailPreviewEl.querySelector('.thumbnail-title').textContent = originalText;
+        }
+    }
+
+    // Set status to posted
+    async function setStatusToPosted() {
+        const newPostId = postIdEl.value;
+
+        if (!newPostId) {
+            alert('Please enter a Post ID first');
+            return;
+        }
+
+        if (!confirm(`Set status to ${newPostId}? This will mark the submission as posted.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}?action=update&key=${submissionId}&status=${newPostId}&password=${password}`);
+            const data = await response.json();
+
+            if (data.success) {
+                alert(`Status updated to ${newPostId}`);
+                // Refresh the submission data
+                fetchSubmissionData();
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (error) {
+            alert(`Failed to update status: ${error.message}`);
+        }
+    }
+
+    // Decline submission
+    async function declineSubmission() {
+        if (!confirm('Are you sure you want to decline this submission?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}?action=update&key=${submissionId}&status=Declined&password=${password}`);
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Submission declined');
+                // Refresh the submission data
+                fetchSubmissionData();
+            } else {
+                throw new Error(data.error);
+            }
+        } catch (error) {
+            alert(`Failed to decline submission: ${error.message}`);
+        }
+    }
+
+    // Go back to list
+    function goBack() {
+        window.location.href = 'index.html';
+    }
+
+    // Show error message
+    function showError(message) {
+        submissionInfoEl.innerHTML = `
+                <div class="error-message">
+                    <strong>Error:</strong> ${message}
+                </div>
+            `;
+    }
+
+    // Event listeners for real-time updates
+    titleEl.addEventListener('input', updateThumbnailPreview);
+</script>
+</body>
+</html>
